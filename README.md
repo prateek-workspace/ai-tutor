@@ -2,8 +2,6 @@
 
 A **voice-first AI co-pilot for smart classrooms** in government schools. Teachers speak in **Hindi, English, or Hinglish**; the assistant detects the command, generates classroom content with **Google Gemini**, and projects it on a smartboard — with optional spoken narration.
 
-Re-scoped from an earlier "AI Tutor" project to the [scope.md](scope.md) deliverables. Everything runs on **Gemini** (text + native text-to-speech); an optional **NeonDB** (PostgreSQL) keeps a history of generated content. The API ships with interactive **Swagger UI**.
-
 ---
 
 ## Table of Contents
@@ -92,18 +90,6 @@ A **Dashboard** (`/dashboard`) provides the teacher's overview (videos, attendan
 
 ---
 
-## Design System
-
-The UI uses a custom dark, editorial aesthetic (not a stock template):
-
-- **Background:** pure black (`bg-black`).
-- **Display type:** *Instrument Serif* (loaded via Google Fonts) — use the `.font-display` class for headings.
-- **Liquid glass:** a reusable `.liquid-glass` class (frosted blur + gradient hairline border) defined in [`globals.css`](frontend/src/app/globals.css), used on nav, cards, inputs, and buttons.
-- **Motion:** Framer Motion `useInView` reveals; the hero uses a vanilla-rAF crossfade-to-black video loop.
-- Landing sections live in [`components/landing/`](frontend/src/components/landing/); the dashboard runs in forced dark mode using shadcn tokens.
-
----
-
 ## Project Structure
 
 ```
@@ -137,17 +123,12 @@ AI Tutor/
         └── lib/ api.js · utils.js
 ```
 
-Removed during the re-scope (out of scope.md): backend RAG/plagiarism/Cartesia code; frontend `pdf-chat`, `url-chat`, `plague`, `doubt-engine`, `virtual-class` pages; 3D classroom components + `.glb`/audio assets.
-
----
-
 ## Requirements
 
 - **Node.js** 18.18+ (Node 20 LTS recommended), **npm**
 - **Python** 3.10–3.12, **pip**, `venv`
 - A **Google Gemini API key** — https://aistudio.google.com/apikey
 - *(Optional)* a **NeonDB** account + connection string — https://neon.tech
-- A **Chromium-based browser** (Chrome/Edge) for voice input — the Web Speech API isn't in Firefox/Safari
 
 ---
 
@@ -201,20 +182,6 @@ Open **http://localhost:3000/smartboard**, click **Speak Command**, and say *"Ex
 
 ---
 
-## Do I Need to Populate the Database?
-
-**No — there is no data to seed.** Every feature is generated live by Gemini. The database is **optional** and only stores a *history* of generations. The only setup is creating one empty table:
-
-```bash
-# after setting DATABASE_URL in backend/.env, run ONE of:
-psql "$DATABASE_URL" -f backend/schema.sql
-cd backend && python init_db.py
-```
-
-No `INSERT`s, no imports. The `generations` table starts empty and fills as you use the app. Inspect via `GET /history` or SQL.
-
----
-
 ## Available Commands
 
 ### Backend (`backend/`)
@@ -236,8 +203,6 @@ No `INSERT`s, no imports. The `generations` table starts empty and fills as you 
 
 - **Swagger UI:** http://127.0.0.1:5000/docs (interactive — try every endpoint in the browser)
 - **OpenAPI spec:** http://127.0.0.1:5000/openapi.json
-
-Base URL `http://127.0.0.1:5000`. All POST bodies are JSON; errors return `{ "error": "..." }`.
 
 | Method | Path | Purpose | Body / Query |
 |--------|------|---------|--------------|
@@ -290,6 +255,4 @@ In the **Activity Guide**, enable **hands-free** mode and say **"next"**, **"pre
 - **Voice input** uses the browser Web Speech API → Chromium-based browsers only; requires mic permission and `localhost`/HTTPS.
 - **Hinglish STT** is approximate (browser transcribes `hi-IN` or `en-IN`; the language selector picks which).
 - The dashboard is largely **mock/sample data** (no analytics backend) — it's kept as the teacher shell per project scope.
-- **CORS is open and Flask debug is on** for local development — lock both down before deploying.
 
-See [mine.md](mine.md) for the full technical deep-dive.
