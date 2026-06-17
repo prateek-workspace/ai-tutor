@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { ArrowRight, Mic, Languages, FlaskConical } from "lucide-react";
+import { ArrowRight, Mic, Languages, FlaskConical, ChevronDown } from "lucide-react";
 import Navbar from "@/components/Navbar";
 
 const HERO_VIDEO =
@@ -56,7 +56,7 @@ export default function Hero() {
   }, []);
 
   return (
-    <section className="relative min-h-screen overflow-hidden flex flex-col">
+    <section id="top" className="relative min-h-screen overflow-hidden flex flex-col">
       <video
         ref={videoRef}
         src={HERO_VIDEO}
@@ -73,7 +73,7 @@ export default function Hero() {
       <Navbar />
 
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-12 text-center -translate-y-[6%]">
-        <h1 className="font-display text-white tracking-tight text-6xl md:text-8xl lg:text-9xl leading-[0.95]">
+        <h1 className="font-display text-white tracking-tight text-5xl sm:text-6xl md:text-8xl lg:text-9xl leading-[0.95] text-balance">
           The classroom that <em className="italic">listens</em>.
         </h1>
 
@@ -96,16 +96,22 @@ export default function Hero() {
           </a>
         </div>
 
-        <div className="mt-10 flex items-center gap-3 text-white/70 text-xs">
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-3 text-white/70 text-xs">
           <span className="liquid-glass rounded-full px-3 py-2 flex items-center gap-2"><Mic className="w-4 h-4" /> Voice commands</span>
           <span className="liquid-glass rounded-full px-3 py-2 flex items-center gap-2"><Languages className="w-4 h-4" /> Hindi · English · Hinglish</span>
           <span className="liquid-glass rounded-full px-3 py-2 hidden sm:flex items-center gap-2"><FlaskConical className="w-4 h-4" /> Activity guides</span>
         </div>
       </div>
 
-      <p className="relative z-10 text-center text-white/40 text-xs pb-8 px-6">
-        Built for government smart classrooms · primary & secondary education
-      </p>
+      <div className="relative z-10 flex flex-col items-center gap-3 pb-8 px-6">
+        <p className="text-center text-white/40 text-xs">
+          Built for government smart classrooms · primary &amp; secondary education
+        </p>
+        <a href="#about" aria-label="Scroll to content"
+          className="text-white/40 hover:text-white transition-colors">
+          <ChevronDown className="w-5 h-5 animate-bounce" />
+        </a>
+      </div>
     </section>
   );
 }

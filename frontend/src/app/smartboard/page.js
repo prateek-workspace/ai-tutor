@@ -317,7 +317,7 @@ export default function Smartboard() {
           />
         )}
         {tab === "voice" && (
-          <VoiceHelp />
+          <VoiceHelp onPick={(cmd) => { setTranscript(cmd); handleVoiceCommand(cmd); }} />
         )}
       </main>
     </div>
@@ -539,28 +539,29 @@ function NavBtn({ onClick, disabled, children }) {
   );
 }
 
-function VoiceHelp() {
+function VoiceHelp({ onPick }) {
   const examples = [
-    { icon: Sparkles, text: '"Explain Newton\'s third law in Hinglish"' },
-    { icon: ListChecks, text: '"Make a 5 question quiz on the water cycle"' },
-    { icon: Languages, text: '"Translate: The mitochondria is the powerhouse of the cell"' },
-    { icon: FlaskConical, text: '"Create an activity to show that air has weight"' },
+    { icon: Sparkles, cmd: "Explain Newton's third law in Hinglish" },
+    { icon: ListChecks, cmd: "Make a 5 question quiz on the water cycle" },
+    { icon: Languages, cmd: "Translate: The mitochondria is the powerhouse of the cell" },
+    { icon: FlaskConical, cmd: "Create an activity to show that air has weight" },
   ];
   return (
-    <div className="max-w-2xl mx-auto text-center mt-10">
+    <div className="max-w-2xl mx-auto text-center mt-8 md:mt-12">
       <h2 className="text-4xl md:text-5xl font-display mb-3">Speak a command to begin</h2>
-      <p className="text-gray-400 mb-8">
-        Press <span className="text-white">Speak Command</span> above and talk naturally in Hindi, English or Hinglish.
-        The assistant detects what you want and projects it on the smartboard.
+      <p className="text-gray-400 mb-8 leading-relaxed">
+        Press <span className="text-white">Speak Command</span> above and talk naturally in Hindi, English or Hinglish —
+        or tap an example to try it instantly.
       </p>
-      <div className="grid sm:grid-cols-2 gap-4 text-left">
+      <div className="grid sm:grid-cols-2 gap-3 text-left">
         {examples.map((e, i) => {
           const Icon = e.icon;
           return (
-            <div key={i} className="liquid-glass rounded-xl p-4 border border-white/10 flex gap-3 items-start">
-              <Icon className="w-5 h-5 text-white/60 mt-0.5 shrink-0" />
-              <span className="text-gray-200">{e.text}</span>
-            </div>
+            <button key={i} onClick={() => onPick?.(e.cmd)}
+              className="liquid-glass rounded-xl p-4 flex gap-3 items-center text-left hover:bg-white/[0.06] transition-colors group">
+              <Icon className="w-5 h-5 text-white/60 group-hover:text-white shrink-0 transition-colors" />
+              <span className="text-gray-200 text-sm">&ldquo;{e.cmd}&rdquo;</span>
+            </button>
           );
         })}
       </div>

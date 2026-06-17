@@ -14,7 +14,7 @@ Endpoints (see README.md for full docs):
     GET  /history     -> recent generated content (from NeonDB, if configured)
     GET  /health      -> health/config check
 """
-
+import os
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 from flask_swagger_ui import get_swaggerui_blueprint
@@ -207,6 +207,6 @@ def history():
 def health():
     return jsonify({"status": "ok", "db_enabled": db.is_enabled()})
 
-
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.getenv("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
