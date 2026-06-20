@@ -4,20 +4,22 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import {
   Mic, MicOff, Volume2, Loader2, Sparkles, ListChecks,
-  Languages, FlaskConical, ChevronLeft, ChevronRight, RotateCcw,
+  Languages, FlaskConical, ChevronLeft, ChevronRight, RotateCcw, Eye, EyeOff,
 } from "lucide-react";
 import {
   runCommand, simplify, quiz, translate, activity, fetchSpeech,
 } from "@/lib/api";
+import ClassTimer from "@/components/ClassTimer";
+import { tr, LANGUAGES } from "@/lib/i18n";
 
 const Mermaid = dynamic(() => import("@/components/Mermaid"), { ssr: false });
 
 const TABS = [
-  { id: "voice", label: "Voice Command", icon: Mic },
-  { id: "simplify", label: "Explain Concept", icon: Sparkles },
-  { id: "quiz", label: "Quiz", icon: ListChecks },
-  { id: "translate", label: "Translate", icon: Languages },
-  { id: "activity", label: "Activity Guide", icon: FlaskConical },
+  { id: "voice", key: "tab_voice", icon: Mic },
+  { id: "simplify", key: "tab_simplify", icon: Sparkles },
+  { id: "quiz", key: "tab_quiz", icon: ListChecks },
+  { id: "translate", key: "tab_translate", icon: Languages },
+  { id: "activity", key: "tab_activity", icon: FlaskConical },
 ];
 
 export default function Smartboard() {
@@ -50,8 +52,11 @@ export default function Smartboard() {
   const navModeRef = useRef(false);
   const stepRef = useRef(0);
   const stepsRef = useRef([]);
+  const timerRef = useRef(null); // imperative handle to the activity ClassTimer
 
-  const sttLang = language === "hindi" ? "hi-IN" : "en-IN";
+  const T = tr(language);
+  // Haryanvi & Hindi both transcribe best with hi-IN.
+  const sttLang = (language === "hindi" || language === "haryanvi") ? "hi-IN" : "en-IN";
 
   useEffect(() => { navModeRef.current = navMode; }, [navMode]);
   useEffect(() => { stepRef.current = activityStep; }, [activityStep]);
@@ -99,13 +104,21 @@ export default function Smartboard() {
     else if (data.intent === "quiz") showQuiz(data.data);
     else if (data.intent === "translate") showTranslation(data.data);
     else if (data.intent === "activity") showActivity(data.data);
-    else setError("Could not understand the command. Please try rephrasing.");
+    else setError(T.notUnderstood);
   };
 
   // ---- Activity hands-free navigation keywords ----
   const handleNavCommand = (text) => {
     const t = text.toLowerCase();
     const steps = stepsRef.current;
+    // Timer voice control takes priority (so "start timer" isn't read as a step).
+    if (t.includes("timer")) {
+      if (t.includes("start") || t.includes("resume") || t.includes("shuru")) timerRef.current?.start();
+      else if (t.includes("pause") || t.includes("stop") || t.includes("rok")) timerRef.current?.pause();
+      else if (t.includes("reset") || t.includes("restart")) timerRef.current?.reset();
+      else timerRef.current?.toggle();
+      return;
+    }
     if (t.includes("next") || t.includes("aage"))
       setActivityStep((s) => Math.min(s + 1, Math.max(steps.length - 1, 0)));
     else if (t.includes("previous") || t.includes("back") || t.includes("pichla"))
@@ -147,7 +160,7 @@ export default function Smartboard() {
   const narrate = async (text) => {
     if (!text) return;
     try {
-      const url = await fetchSpeech(text, language === "hindi" ? "Kore" : undefined);
+      const url = await fetchSpeech(text, (language === "hindi" || language === "haryanvi") ? "Kore" : undefined);
       if (audioRef.current) {
         audioRef.current.src = url;
         audioRef.current.play();
@@ -193,19 +206,19 @@ export default function Smartboard() {
           <Sparkles className="w-7 h-7 text-white/60" />
           <div>
             <h1 className="text-2xl font-display leading-none">Sahayak</h1>
-            <p className="text-xs text-gray-400">Voice-first smartboard co-pilot</p>
+            <p className="text-xs text-gray-400">{T.subtitle}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">Language</span>
+          <span className="text-xs text-gray-400">{T.languageLabel}</span>
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
-            className="bg-white/5 border border-white/10 rounded-md px-3 py-1.5 text-sm"
+            className="bg-white/5 border border-white/10 rounded-md px-3 py-1.5 text-sm [&>option]:text-black"
           >
-            <option value="hinglish">Hinglish</option>
-            <option value="hindi">Hindi</option>
-            <option value="english">English</option>
+            {LANGUAGES.map((l) => (
+              <option key={l.id} value={l.id}>{l.label}</option>
+            ))}
           </select>
         </div>
       </header>
@@ -223,7 +236,7 @@ export default function Smartboard() {
               }`}
             >
               <Icon className="w-4 h-4" />
-              {t.label}
+              {T[t.key]}
             </button>
           );
         })}
@@ -238,20 +251,20 @@ export default function Smartboard() {
           }`}
         >
           {listening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-          {listening ? "Listening…" : "Speak Command"}
+          {listening ? T.listening : T.speak}
         </button>
         <input
           value={transcript}
           onChange={(e) => setTranscript(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleVoiceCommand(transcript)}
-          placeholder='Or type a command — e.g. "Explain photosynthesis" / "Make a quiz on fractions"'
+          placeholder={T.cmdPlaceholder}
           className="flex-1 w-full bg-white/5 border border-white/10 rounded-full px-5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-white/30"
         />
         <button
           onClick={() => handleVoiceCommand(transcript)}
           className="px-5 py-3 rounded-full bg-white/10 hover:bg-white/20 text-sm"
         >
-          Run
+          {T.run}
         </button>
       </div>
 
@@ -259,12 +272,12 @@ export default function Smartboard() {
       <div className="px-6 pt-3 min-h-[28px]">
         {loading && (
           <p className="text-sm text-white flex items-center gap-2">
-            <Loader2 className="w-4 h-4 animate-spin" /> Generating…
+            <Loader2 className="w-4 h-4 animate-spin" /> {T.generating}
           </p>
         )}
         {error && <p className="text-sm text-red-400">{error}</p>}
         {lastIntent && !loading && (
-          <p className="text-xs text-gray-400">Detected intent: <span className="text-white">{lastIntent}</span></p>
+          <p className="text-xs text-gray-400">{T.detectedIntent} <span className="text-white">{lastIntent}</span></p>
         )}
       </div>
 
@@ -272,6 +285,7 @@ export default function Smartboard() {
       <main className="flex-1 p-6">
         {tab === "simplify" && (
           <SimplifyView
+            T={T}
             concept={concept}
             topicInput={topicInput}
             setTopicInput={setTopicInput}
@@ -281,6 +295,7 @@ export default function Smartboard() {
         )}
         {tab === "quiz" && (
           <QuizView
+            T={T}
             quizData={quizData}
             topicInput={topicInput}
             setTopicInput={setTopicInput}
@@ -289,10 +304,12 @@ export default function Smartboard() {
             type={quizType}
             setType={setQuizType}
             onGenerate={doQuiz}
+            onNarrate={narrate}
           />
         )}
         {tab === "translate" && (
           <TranslateView
+            T={T}
             translation={translation}
             input={translateInput}
             setInput={setTranslateInput}
@@ -302,6 +319,8 @@ export default function Smartboard() {
         )}
         {tab === "activity" && (
           <ActivityView
+            T={T}
+            language={language}
             activityData={activityData}
             step={activityStep}
             setStep={setActivityStep}
@@ -314,10 +333,11 @@ export default function Smartboard() {
             listening={listening}
             startListening={startListening}
             stopListening={stopListening}
+            timerRef={timerRef}
           />
         )}
         {tab === "voice" && (
-          <VoiceHelp onPick={(cmd) => { setTranscript(cmd); handleVoiceCommand(cmd); }} />
+          <VoiceHelp T={T} onPick={(cmd) => { setTranscript(cmd); handleVoiceCommand(cmd); }} />
         )}
       </main>
     </div>
@@ -346,21 +366,21 @@ function GenButton({ onClick, children }) {
   );
 }
 
-function SimplifyView({ concept, topicInput, setTopicInput, onGenerate, onNarrate }) {
+function SimplifyView({ T, concept, topicInput, setTopicInput, onGenerate, onNarrate }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-3">
         <Field value={topicInput} onChange={setTopicInput} onEnter={onGenerate}
-          placeholder="Enter a concept to explain — e.g. Photosynthesis" />
-        <GenButton onClick={onGenerate}>Explain</GenButton>
+          placeholder={T.simplifyPlaceholder} />
+        <GenButton onClick={onGenerate}>{T.explain}</GenButton>
       </div>
       {concept && (
         <div className="grid lg:grid-cols-2 gap-6">
-          <div className="liquid-glass rounded-2xl p-6 border border-white/10">
-            <div className="flex items-center justify-between mb-3">
+          <div className="liquid-glass rounded-2xl p-6">
+            <div className="flex items-center justify-between gap-3 mb-3">
               <h2 className="text-3xl font-display text-white">{concept.topic}</h2>
-              <button onClick={onNarrate} className="flex items-center gap-2 text-sm bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg">
-                <Volume2 className="w-4 h-4" /> Narrate
+              <button onClick={onNarrate} className="shrink-0 flex items-center gap-2 text-sm bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg">
+                <Volume2 className="w-4 h-4" /> {T.narrate}
               </button>
             </div>
             <p className="text-lg leading-relaxed text-gray-100">{concept.explanation}</p>
@@ -374,9 +394,9 @@ function SimplifyView({ concept, topicInput, setTopicInput, onGenerate, onNarrat
               </ul>
             )}
           </div>
-          <div className="liquid-glass rounded-2xl p-6 border border-white/10">
-            <h3 className="text-sm uppercase text-gray-400 mb-4">Visual Aid</h3>
-            {concept.diagram ? <Mermaid chart={concept.diagram} /> : <p className="text-gray-500">No diagram generated.</p>}
+          <div className="liquid-glass rounded-2xl p-6">
+            <h3 className="text-sm uppercase text-gray-400 mb-4">{T.visualAid}</h3>
+            {concept.diagram ? <Mermaid chart={concept.diagram} /> : <p className="text-gray-500">{T.noDiagram}</p>}
           </div>
         </div>
       )}
@@ -384,79 +404,126 @@ function SimplifyView({ concept, topicInput, setTopicInput, onGenerate, onNarrat
   );
 }
 
-function QuizView({ quizData, topicInput, setTopicInput, count, setCount, type, setType, onGenerate }) {
+function QuizView({ T, quizData, topicInput, setTopicInput, count, setCount, type, setType, onGenerate, onNarrate }) {
+  // Answers stay hidden by default so a class can attempt them first.
+  const [revealed, setRevealed] = useState({});
+  const questions = quizData?.questions || [];
+
+  // Reset reveals whenever a fresh quiz arrives.
+  useEffect(() => { setRevealed({}); }, [quizData]);
+
+  const allShown = questions.length > 0 && questions.every((_, i) => revealed[i]);
+  const toggleAll = () => {
+    if (allShown) setRevealed({});
+    else setRevealed(Object.fromEntries(questions.map((_, i) => [i, true])));
+  };
+  const readAloud = (q) => {
+    const opts = q.options ? " Options: " + q.options.map((o, j) => `${String.fromCharCode(65 + j)}. ${o}.`).join(" ") : "";
+    onNarrate?.(`${q.question}${opts}`);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-3 items-stretch">
         <Field value={topicInput} onChange={setTopicInput} onEnter={onGenerate}
-          placeholder="Quiz topic — e.g. The Water Cycle" />
+          placeholder={T.quizPlaceholder} />
         <select value={type} onChange={(e) => setType(e.target.value)}
-          className="bg-white/5 border border-white/10 rounded-lg px-4">
-          <option value="mcq">MCQ</option>
-          <option value="short">Short answer</option>
+          className="bg-white/5 border border-white/10 rounded-lg px-4 [&>option]:text-black">
+          <option value="mcq">{T.mcq}</option>
+          <option value="short">{T.shortAnswer}</option>
         </select>
         <input type="number" min={1} max={20} value={count}
           onChange={(e) => setCount(e.target.value)}
           className="w-20 bg-white/5 border border-white/10 rounded-lg px-4 text-center" />
-        <GenButton onClick={onGenerate}>Generate</GenButton>
+        <GenButton onClick={onGenerate}>{T.generate}</GenButton>
       </div>
-      {quizData?.questions?.length > 0 && (
-        <div className="space-y-4">
-          {quizData.questions.map((q, i) => (
-            <div key={i} className="liquid-glass rounded-2xl p-5 border border-white/10">
-              <p className="text-lg font-semibold mb-3">
-                <span className="text-white/60">Q{i + 1}.</span> {q.question}
-              </p>
-              {q.options && (
-                <div className="grid sm:grid-cols-2 gap-2">
-                  {q.options.map((opt, j) => (
-                    <div key={j}
-                      className={`px-4 py-2 rounded-lg border ${
-                        opt === q.answer
-                          ? "border-green-500/60 bg-green-500/10 text-green-300"
-                          : "border-white/10 bg-white/5"
-                      }`}>
-                      {String.fromCharCode(65 + j)}. {opt}
+
+      {questions.length > 0 && (
+        <>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-white/50 text-sm">{questions.length} {T.questions} · {T.answersHidden}</p>
+            <button onClick={toggleAll}
+              className="shrink-0 flex items-center gap-2 text-sm liquid-glass rounded-lg px-4 py-2 hover:bg-white/10">
+              {allShown ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {allShown ? T.hideAll : T.revealAll}
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {questions.map((q, i) => {
+              const show = !!revealed[i];
+              return (
+                <div key={i} className="liquid-glass rounded-2xl p-5">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <p className="text-lg font-semibold">
+                      <span className="text-white/50">Q{i + 1}.</span> {q.question}
+                    </p>
+                    <button onClick={() => readAloud(q)} aria-label="Read question aloud"
+                      className="shrink-0 bg-white/10 hover:bg-white/20 p-2 rounded-lg">
+                      <Volume2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {q.options && (
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {q.options.map((opt, j) => (
+                        <div key={j}
+                          className={`px-4 py-2 rounded-lg border transition-colors ${
+                            show && opt === q.answer
+                              ? "border-green-500/60 bg-green-500/10 text-green-300"
+                              : "border-white/10 bg-white/5"
+                          }`}>
+                          {String.fromCharCode(65 + j)}. {opt}
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                  <div className="mt-3">
+                    {show ? (
+                      <p className="text-sm text-green-300">{T.answerLabel} {q.answer}</p>
+                    ) : (
+                      <button onClick={() => setRevealed((r) => ({ ...r, [i]: true }))}
+                        className="text-sm text-white/60 hover:text-white underline underline-offset-4">
+                        {T.revealOne}
+                      </button>
+                    )}
+                  </div>
                 </div>
-              )}
-              <p className="mt-3 text-sm text-green-300">Answer: {q.answer}</p>
-            </div>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
 }
 
-function TranslateView({ translation, input, setInput, onGenerate, onNarrate }) {
+function TranslateView({ T, translation, input, setInput, onGenerate, onNarrate }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3">
         <textarea value={input} onChange={(e) => setInput(e.target.value)}
-          placeholder="Enter or dictate text to translate between Hindi and English…"
+          placeholder={T.translatePlaceholder}
           rows={3}
           className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-white/30" />
-        <div><GenButton onClick={onGenerate}>Translate</GenButton></div>
+        <div><GenButton onClick={onGenerate}>{T.translateBtn}</GenButton></div>
       </div>
       {translation && (
         <div className="grid md:grid-cols-2 gap-6">
-          <LangCard title="English" text={translation.english} onNarrate={() => onNarrate(translation.english)} />
-          <LangCard title="हिन्दी (Hindi)" text={translation.hindi} onNarrate={() => onNarrate(translation.hindi)} />
+          <LangCard T={T} title="English" text={translation.english} onNarrate={() => onNarrate(translation.english)} />
+          <LangCard T={T} title="हिन्दी (Hindi)" text={translation.hindi} onNarrate={() => onNarrate(translation.hindi)} />
         </div>
       )}
     </div>
   );
 }
 
-function LangCard({ title, text, onNarrate }) {
+function LangCard({ T, title, text, onNarrate }) {
   return (
-    <div className="liquid-glass rounded-2xl p-6 border border-white/10">
+    <div className="liquid-glass rounded-2xl p-6">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xl font-display text-white">{title}</h3>
         <button onClick={onNarrate} className="flex items-center gap-2 text-sm bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg">
-          <Volume2 className="w-4 h-4" /> Read
+          <Volume2 className="w-4 h-4" /> {T.read}
         </button>
       </div>
       <p className="text-lg leading-relaxed whitespace-pre-wrap">{text}</p>
@@ -465,8 +532,8 @@ function LangCard({ title, text, onNarrate }) {
 }
 
 function ActivityView({
-  activityData, step, setStep, topicInput, setTopicInput, onGenerate, onNarrate,
-  navMode, setNavMode, listening, startListening, stopListening,
+  T, language, activityData, step, setStep, topicInput, setTopicInput, onGenerate, onNarrate,
+  navMode, setNavMode, listening, startListening, stopListening, timerRef,
 }) {
   const steps = activityData?.steps || [];
   const current = steps[step];
@@ -474,8 +541,8 @@ function ActivityView({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-3">
         <Field value={topicInput} onChange={setTopicInput} onEnter={onGenerate}
-          placeholder="Activity topic — e.g. Show that air has weight" />
-        <GenButton onClick={onGenerate}>Build Activity</GenButton>
+          placeholder={T.activityPlaceholder} />
+        <GenButton onClick={onGenerate}>{T.buildActivity}</GenButton>
       </div>
       {activityData && (
         <div className="space-y-6">
@@ -492,13 +559,13 @@ function ActivityView({
                 navMode ? "bg-red-600" : "bg-white/10 hover:bg-white/20"
               }`}>
               <Mic className="w-4 h-4" />
-              {navMode ? "Hands-free ON (say: next / repeat / previous)" : "Enable hands-free"}
+              {navMode ? T.handsFreeOn : T.enableHandsFree}
             </button>
           </div>
 
           {activityData.materials?.length > 0 && (
-            <div className="liquid-glass rounded-2xl p-5 border border-white/10">
-              <h3 className="text-sm uppercase text-gray-400 mb-2">Materials</h3>
+            <div className="liquid-glass rounded-2xl p-5">
+              <h3 className="text-sm uppercase text-gray-400 mb-2">{T.materials}</h3>
               <div className="flex flex-wrap gap-2">
                 {activityData.materials.map((m, i) => (
                   <span key={i} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-sm">{m}</span>
@@ -507,23 +574,42 @@ function ActivityView({
             </div>
           )}
 
-          {/* Big current step for the smartboard */}
-          <div className="liquid-glass bg-gradient-to-br from-white/[0.06] to-transparent rounded-2xl p-10 min-h-[220px] flex flex-col justify-center">
-            <p className="text-sm text-gray-400 mb-2">Step {step + 1} of {steps.length}</p>
-            <p className="text-3xl font-semibold leading-snug">{current}</p>
+          {/* Step progress dots */}
+          <div className="flex items-center justify-center gap-2">
+            {steps.map((_, i) => (
+              <button key={i} onClick={() => setStep(i)} aria-label={`Go to step ${i + 1}`}
+                className={`h-2 rounded-full transition-all ${
+                  i === step ? "w-8 bg-white" : "w-2 bg-white/25 hover:bg-white/50"
+                }`} />
+            ))}
           </div>
 
-          <div className="flex items-center justify-center gap-4">
+          {/* Big current step for the smartboard */}
+          <div className="liquid-glass bg-gradient-to-br from-white/[0.06] to-transparent rounded-2xl p-8 md:p-10 min-h-[200px] md:min-h-[220px] flex flex-col justify-center">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-gray-400">{T.step} {step + 1} {T.of} {steps.length}</p>
+              <button onClick={() => onNarrate(current)}
+                className="flex items-center gap-2 text-sm bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg">
+                <Volume2 className="w-4 h-4" /> {T.readAloud}
+              </button>
+            </div>
+            <p className="text-2xl md:text-3xl font-semibold leading-snug">{current}</p>
+          </div>
+
+          <div className="flex items-center justify-center gap-3 md:gap-4">
             <NavBtn onClick={() => setStep(Math.max(step - 1, 0))} disabled={step === 0}>
-              <ChevronLeft className="w-5 h-5" /> Previous
+              <ChevronLeft className="w-5 h-5" /> {T.previous}
             </NavBtn>
             <NavBtn onClick={() => onNarrate(current)}>
-              <RotateCcw className="w-5 h-5" /> Repeat
+              <RotateCcw className="w-5 h-5" /> {T.repeat}
             </NavBtn>
             <NavBtn onClick={() => setStep(Math.min(step + 1, steps.length - 1))} disabled={step === steps.length - 1}>
-              Next <ChevronRight className="w-5 h-5" />
+              {T.next} <ChevronRight className="w-5 h-5" />
             </NavBtn>
           </div>
+
+          {/* On-screen classroom timer (button + hands-free controlled) */}
+          <ClassTimer ref={timerRef} lang={language} />
         </div>
       )}
     </div>
@@ -539,20 +625,17 @@ function NavBtn({ onClick, disabled, children }) {
   );
 }
 
-function VoiceHelp({ onPick }) {
+function VoiceHelp({ T, onPick }) {
   const examples = [
-    { icon: Sparkles, cmd: "Explain Newton's third law in Hinglish" },
-    { icon: ListChecks, cmd: "Make a 5 question quiz on the water cycle" },
-    { icon: Languages, cmd: "Translate: The mitochondria is the powerhouse of the cell" },
-    { icon: FlaskConical, cmd: "Create an activity to show that air has weight" },
+    { icon: Sparkles, cmd: T.ex_explain },
+    { icon: ListChecks, cmd: T.ex_quiz },
+    { icon: Languages, cmd: T.ex_translate },
+    { icon: FlaskConical, cmd: T.ex_activity },
   ];
   return (
     <div className="max-w-2xl mx-auto text-center mt-8 md:mt-12">
-      <h2 className="text-4xl md:text-5xl font-display mb-3">Speak a command to begin</h2>
-      <p className="text-gray-400 mb-8 leading-relaxed">
-        Press <span className="text-white">Speak Command</span> above and talk naturally in Hindi, English or Hinglish —
-        or tap an example to try it instantly.
-      </p>
+      <h2 className="text-4xl md:text-5xl font-display mb-3">{T.voiceHelpTitle}</h2>
+      <p className="text-gray-400 mb-8 leading-relaxed">{T.voiceHelpBody}</p>
       <div className="grid sm:grid-cols-2 gap-3 text-left">
         {examples.map((e, i) => {
           const Icon = e.icon;

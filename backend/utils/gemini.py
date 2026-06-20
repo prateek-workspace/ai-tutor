@@ -25,7 +25,20 @@ load_dotenv()
 # The new SDK reads GEMINI_API_KEY (or GOOGLE_API_KEY) automatically, but we
 # pass it explicitly so configuration is obvious and fails loudly if missing.
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-TEXT_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.0-flash")
+TEXT_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
+
+# Human-readable instruction for each supported teaching language.
+LANGUAGE_INSTRUCTIONS = {
+    "hinglish": "conversational Hinglish (Hindi-English mix, written in Roman script)",
+    "hindi": "simple Hindi (Devanagari script)",
+    "english": "simple English",
+    "haryanvi": "the conversational Haryanvi dialect of Hindi as spoken in Haryana, written in Devanagari script (use Haryanvi words and grammar like 'सै', 'के', 'कोन्या', 'थारे')",
+}
+
+
+def language_phrase(language):
+    return LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["hinglish"])
+
 
 _client = None
 
@@ -87,11 +100,7 @@ def simplify_concept(topic, language="hinglish", level="secondary"):
 
     Returns: { topic, language, explanation, key_points: [...], diagram: "<mermaid>" }
     """
-    lang_instruction = {
-        "hinglish": "conversational Hinglish (Hindi-English mix, written in Roman script)",
-        "hindi": "simple Hindi (Devanagari script)",
-        "english": "simple English",
-    }.get(language, "conversational Hinglish")
+    lang_instruction = language_phrase(language)
 
     system = (
         "You are a friendly Indian government-school teacher's AI co-pilot. "
@@ -157,7 +166,7 @@ def generate_quiz(topic, n=5, qtype="mcq", language="english"):
 
     system = "You are an exam-setter for Indian school classrooms. Questions are clear and unambiguous."
     prompt = f"""Generate exactly {n} {('short-answer' if qtype == 'short' else 'multiple-choice')} questions about "{topic}".
-Write the questions in {language}.
+Write the questions (and options/answers) in {language_phrase(language)}.
 
 Respond ONLY as a JSON array with this exact shape:
 {shape}"""
@@ -213,7 +222,7 @@ def generate_activity(topic, language="english"):
         "government schools using easily available materials."
     )
     prompt = f"""Design a classroom activity/experiment for: "{topic}".
-Write it in {language}.
+Write the title and steps in {language_phrase(language)}.
 
 Respond ONLY as JSON:
 {{
@@ -246,7 +255,7 @@ def detect_intent(transcript):
     """
     system = (
         "You route voice commands from a teacher to the correct classroom tool. "
-        "The teacher may speak Hindi, English or Hinglish."
+        "The teacher may speak Hindi, English, Hinglish or the Haryanvi dialect."
     )
     prompt = f"""A teacher said: "{transcript}"
 
@@ -266,7 +275,7 @@ Respond ONLY as JSON:
   "text": "the text to translate (only for translate intent), else empty string",
   "n": number of questions if a quiz is requested else 5,
   "qtype": "mcq or short (for quiz), else mcq",
-  "language": "hinglish | hindi | english based on what the teacher wants, default hinglish"
+  "language": "hinglish | hindi | english | haryanvi based on what the teacher wants, default hinglish"
 }}"""
 
     data = _generate_json(prompt, system_instruction=system, temperature=0.1)

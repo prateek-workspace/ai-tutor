@@ -1,18 +1,39 @@
 // Central client for the Voice-Enabled AI Teaching Assistant backend.
 // Override the base URL with NEXT_PUBLIC_API_BASE_URL when deploying.
 
+// The backend defaults to port 10000 (see apiEndpoints.py: os.getenv("PORT", 10000)).
 export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:5000";
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:10000";
+
+// Turns the browser's cryptic "Failed to fetch" into something a teacher can act on.
+const UNREACHABLE = (path) =>
+  `Cannot reach the backend at ${API_BASE}. ` +
+  `Make sure the Flask server is running (in /backend: python apiEndpoints.py — it listens on port 10000), ` +
+  `and that NEXT_PUBLIC_API_BASE_URL points to it.`;
+
+async function safeFetch(path, options) {
+  try {
+    return await fetch(`${API_BASE}${path}`, options);
+  } catch (e) {
+    // A TypeError here means the request never reached the server (network/CORS/down).
+    throw new Error(UNREACHABLE(path));
+  }
+}
 
 async function postJSON(path, body) {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await safeFetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const data = await res.json();
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`The backend returned an unexpected response (HTTP ${res.status}).`);
+  }
   if (!res.ok || data.error) {
-    throw new Error(data.error || `Request to ${path} failed`);
+    throw new Error(data.error || `Request to ${path} failed (HTTP ${res.status}).`);
   }
   return data;
 }
@@ -29,12 +50,12 @@ export const activity = (topic, language = "english") =>
 
 // ---- Gemini text-to-speech: returns a playable object URL ----
 export async function fetchSpeech(text, voice) {
-  const res = await fetch(`${API_BASE}/tts`, {
+  const res = await safeFetch("/tts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, voice }),
   });
-  if (!res.ok) throw new Error("TTS request failed");
+  if (!res.ok) throw new Error(`Narration failed (HTTP ${res.status}).`);
   const blob = await res.blob();
   return URL.createObjectURL(blob);
 }

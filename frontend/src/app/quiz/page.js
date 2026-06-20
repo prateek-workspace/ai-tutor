@@ -64,9 +64,11 @@ export default function QuizStudio() {
                   className="w-20 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-center text-white" />
               </label>
               <select value={language} onChange={(e) => setLanguage(e.target.value)}
-                className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm">
+                className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm [&>option]:text-black">
                 <option value="english">English</option>
                 <option value="hindi">Hindi</option>
+                <option value="hinglish">Hinglish</option>
+                <option value="haryanvi">Haryanvi</option>
               </select>
               <button onClick={handleGenerate} disabled={loading}
                 className="ml-auto flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-black font-semibold hover:bg-white/90 disabled:opacity-50">
