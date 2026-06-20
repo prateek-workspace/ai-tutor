@@ -5,11 +5,13 @@ import dynamic from "next/dynamic";
 import {
   Mic, MicOff, Volume2, Loader2, Sparkles, ListChecks,
   Languages, FlaskConical, ChevronLeft, ChevronRight, RotateCcw, Eye, EyeOff,
+  Image as ImageIcon, RefreshCw,
 } from "lucide-react";
 import {
-  runCommand, simplify, quiz, translate, activity, fetchSpeech,
+  runCommand, simplify, quiz, translate, activity, fetchSpeech, fetchImage,
 } from "@/lib/api";
 import ClassTimer from "@/components/ClassTimer";
+import AppNav from "@/components/AppNav";
 import { tr, LANGUAGES } from "@/lib/i18n";
 
 const Mermaid = dynamic(() => import("@/components/Mermaid"), { ssr: false });
@@ -199,15 +201,13 @@ export default function Smartboard() {
   return (
     <div className="min-h-screen bg-black text-white flex flex-col dark-scroll">
       <audio ref={audioRef} className="hidden" />
+      <AppNav />
 
       {/* Header */}
-      <header className="border-b border-white/10 px-6 py-4 flex items-center justify-between bg-black/70 backdrop-blur">
+      <header className="border-b border-white/10 px-6 py-3 flex items-center justify-between bg-black/70 backdrop-blur">
         <div className="flex items-center gap-3">
-          <Sparkles className="w-7 h-7 text-white/60" />
-          <div>
-            <h1 className="text-2xl font-display leading-none">Sahayak</h1>
-            <p className="text-xs text-gray-400">{T.subtitle}</p>
-          </div>
+          <Sparkles className="w-6 h-6 text-white/60" />
+          <p className="text-sm text-gray-400">{T.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-400">{T.languageLabel}</span>
@@ -407,10 +407,19 @@ function SimplifyView({ T, concept, topicInput, setTopicInput, onGenerate, onNar
 function QuizView({ T, quizData, topicInput, setTopicInput, count, setCount, type, setType, onGenerate, onNarrate }) {
   // Answers stay hidden by default so a class can attempt them first.
   const [revealed, setRevealed] = useState({});
+  // Per-question visual aid images (generated lazily on click).
+  const [activeQ, setActiveQ] = useState(null);
+  const [images, setImages] = useState({});     // index -> object URL
+  const [loadingIdx, setLoadingIdx] = useState(null);
+  const [errIdx, setErrIdx] = useState({});     // index -> message
   const questions = quizData?.questions || [];
+  const topic = quizData?.topic || "";
 
-  // Reset reveals whenever a fresh quiz arrives.
-  useEffect(() => { setRevealed({}); }, [quizData]);
+  // Reset everything (and free old image URLs) whenever a fresh quiz arrives.
+  useEffect(() => {
+    setRevealed({}); setActiveQ(null); setLoadingIdx(null); setErrIdx({});
+    setImages((old) => { Object.values(old).forEach(URL.revokeObjectURL); return {}; });
+  }, [quizData]);
 
   const allShown = questions.length > 0 && questions.every((_, i) => revealed[i]);
   const toggleAll = () => {
@@ -420,6 +429,25 @@ function QuizView({ T, quizData, topicInput, setTopicInput, count, setCount, typ
   const readAloud = (q) => {
     const opts = q.options ? " Options: " + q.options.map((o, j) => `${String.fromCharCode(65 + j)}. ${o}.`).join(" ") : "";
     onNarrate?.(`${q.question}${opts}`);
+  };
+
+  const imagePrompt = (q) =>
+    `A simple, colourful educational illustration for a school classroom smartboard that helps students understand this question. ` +
+    `Clear, friendly, diagram-like, with little or no text. Topic: ${topic}. Question: ${q.question}`;
+
+  const generateFor = async (i, { force = false } = {}) => {
+    setActiveQ(i);
+    if (!force && (images[i] || loadingIdx === i)) return;
+    setErrIdx((e) => ({ ...e, [i]: undefined }));
+    setLoadingIdx(i);
+    try {
+      const url = await fetchImage(imagePrompt(questions[i]));
+      setImages((m) => ({ ...m, [i]: url }));
+    } catch (e) {
+      setErrIdx((er) => ({ ...er, [i]: e.message || T.imageError }));
+    } finally {
+      setLoadingIdx((cur) => (cur === i ? null : cur));
+    }
   };
 
   return (
@@ -439,29 +467,40 @@ function QuizView({ T, quizData, topicInput, setTopicInput, count, setCount, typ
       </div>
 
       {questions.length > 0 && (
-        <>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-white/50 text-sm">{questions.length} {T.questions} · {T.answersHidden}</p>
-            <button onClick={toggleAll}
-              className="shrink-0 flex items-center gap-2 text-sm liquid-glass rounded-lg px-4 py-2 hover:bg-white/10">
-              {allShown ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              {allShown ? T.hideAll : T.revealAll}
-            </button>
-          </div>
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Questions */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-white/50 text-sm">{questions.length} {T.questions} · {T.answersHidden}</p>
+              <button onClick={toggleAll}
+                className="shrink-0 flex items-center gap-2 text-sm liquid-glass rounded-lg px-4 py-2 hover:bg-white/10">
+                {allShown ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {allShown ? T.hideAll : T.revealAll}
+              </button>
+            </div>
 
-          <div className="space-y-4">
             {questions.map((q, i) => {
               const show = !!revealed[i];
+              const isActive = activeQ === i;
               return (
-                <div key={i} className="liquid-glass rounded-2xl p-5">
+                <button key={i} type="button" onClick={() => generateFor(i)}
+                  className={`w-full text-left liquid-glass rounded-2xl p-5 transition-colors ${
+                    isActive ? "ring-2 ring-white/40" : "hover:bg-white/[0.04]"
+                  }`}>
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <p className="text-lg font-semibold">
                       <span className="text-white/50">Q{i + 1}.</span> {q.question}
                     </p>
-                    <button onClick={() => readAloud(q)} aria-label="Read question aloud"
-                      className="shrink-0 bg-white/10 hover:bg-white/20 p-2 rounded-lg">
-                      <Volume2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="bg-white/10 p-2 rounded-lg" title={T.visualAid}>
+                        {loadingIdx === i ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                      </span>
+                      <span onClick={(e) => { e.stopPropagation(); readAloud(q); }}
+                        role="button" aria-label="Read question aloud"
+                        className="bg-white/10 hover:bg-white/20 p-2 rounded-lg cursor-pointer">
+                        <Volume2 className="w-4 h-4" />
+                      </span>
+                    </div>
                   </div>
                   {q.options && (
                     <div className="grid sm:grid-cols-2 gap-2">
@@ -481,17 +520,61 @@ function QuizView({ T, quizData, topicInput, setTopicInput, count, setCount, typ
                     {show ? (
                       <p className="text-sm text-green-300">{T.answerLabel} {q.answer}</p>
                     ) : (
-                      <button onClick={() => setRevealed((r) => ({ ...r, [i]: true }))}
-                        className="text-sm text-white/60 hover:text-white underline underline-offset-4">
+                      <span onClick={(e) => { e.stopPropagation(); setRevealed((r) => ({ ...r, [i]: true })); }}
+                        role="button"
+                        className="text-sm text-white/60 hover:text-white underline underline-offset-4 cursor-pointer">
                         {T.revealOne}
-                      </button>
+                      </span>
                     )}
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
-        </>
+
+          {/* Visual Aid panel */}
+          <div className="lg:col-span-1">
+            <div className="liquid-glass rounded-2xl p-5 lg:sticky lg:top-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm uppercase text-gray-400">{T.visualAid}</h3>
+                {activeQ !== null && images[activeQ] && (
+                  <button onClick={() => generateFor(activeQ, { force: true })}
+                    className="flex items-center gap-1 text-xs text-white/60 hover:text-white">
+                    <RefreshCw className="w-3.5 h-3.5" /> {T.regenerate}
+                  </button>
+                )}
+              </div>
+
+              {activeQ === null ? (
+                <div className="aspect-square rounded-xl border border-dashed border-white/15 flex flex-col items-center justify-center text-center p-6 text-white/40">
+                  <ImageIcon className="w-8 h-8 mb-3" />
+                  <p className="text-sm">{T.quizVisualHint}</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-white/50 mb-3">Q{activeQ + 1}. {questions[activeQ]?.question}</p>
+                  {loadingIdx === activeQ ? (
+                    <div className="aspect-square rounded-xl bg-white/5 flex flex-col items-center justify-center text-white/50">
+                      <Loader2 className="w-7 h-7 animate-spin mb-3" />
+                      <p className="text-sm">{T.drawing}</p>
+                    </div>
+                  ) : images[activeQ] ? (
+                    <img src={images[activeQ]} alt={`Visual aid for question ${activeQ + 1}`}
+                      className="w-full rounded-xl border border-white/10" />
+                  ) : (
+                    <div className="aspect-square rounded-xl bg-white/5 flex flex-col items-center justify-center text-center p-6">
+                      <p className="text-sm text-red-300 mb-3">{errIdx[activeQ] || T.imageError}</p>
+                      <button onClick={() => generateFor(activeQ, { force: true })}
+                        className="flex items-center gap-2 text-sm bg-white text-black px-4 py-2 rounded-lg hover:bg-white/90">
+                        <RefreshCw className="w-4 h-4" /> {T.regenerate}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -537,6 +620,48 @@ function ActivityView({
 }) {
   const steps = activityData?.steps || [];
   const current = steps[step];
+
+  // Per-step generated illustrations — a visual storyboard of the activity.
+  const [showVisuals, setShowVisuals] = useState(true);
+  const [stepImages, setStepImages] = useState({});
+  const [stepLoading, setStepLoading] = useState(null);
+  const [stepErr, setStepErr] = useState({});
+  const imagesRef = useRef({});
+  const loadingRef = useRef(null);
+
+  // Reset (and free) images whenever a new activity arrives.
+  useEffect(() => {
+    Object.values(imagesRef.current).forEach(URL.revokeObjectURL);
+    imagesRef.current = {};
+    setStepImages({}); setStepErr({}); setStepLoading(null); loadingRef.current = null;
+  }, [activityData]);
+
+  const stepPrompt = (i) =>
+    `A clear, simple, colourful illustration for a school classroom showing this step of a hands-on activity being performed. ` +
+    `Friendly diagram/illustration style, minimal or no text. Activity: ${activityData?.title || ""}. Step ${i + 1}: ${steps[i]}`;
+
+  const genStep = async (i, force = false) => {
+    if (steps[i] == null) return;
+    if (!force && (imagesRef.current[i] || loadingRef.current === i)) return;
+    loadingRef.current = i; setStepLoading(i);
+    setStepErr((e) => ({ ...e, [i]: undefined }));
+    try {
+      const url = await fetchImage(stepPrompt(i));
+      imagesRef.current = { ...imagesRef.current, [i]: url };
+      setStepImages(imagesRef.current);
+    } catch (e) {
+      setStepErr((er) => ({ ...er, [i]: e.message || T.imageError }));
+    } finally {
+      if (loadingRef.current === i) { loadingRef.current = null; setStepLoading(null); }
+    }
+  };
+
+  // Auto-draw the current step's visual as the teacher walks through.
+  useEffect(() => {
+    if (showVisuals && steps.length) genStep(step);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, showVisuals, activityData]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-3">
@@ -548,19 +673,27 @@ function ActivityView({
         <div className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-3xl font-display text-white">{activityData.title}</h2>
-            <button
-              onClick={() => {
-                const next = !navMode;
-                setNavMode(next);
-                if (next && !listening) startListening();
-                if (!next && listening) stopListening();
-              }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm ${
-                navMode ? "bg-red-600" : "bg-white/10 hover:bg-white/20"
-              }`}>
-              <Mic className="w-4 h-4" />
-              {navMode ? T.handsFreeOn : T.enableHandsFree}
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowVisuals((v) => !v)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm ${
+                  showVisuals ? "bg-white/10 hover:bg-white/20" : "bg-white/5 text-white/50 hover:bg-white/10"
+                }`}>
+                <ImageIcon className="w-4 h-4" /> {T.visuals}
+              </button>
+              <button
+                onClick={() => {
+                  const next = !navMode;
+                  setNavMode(next);
+                  if (next && !listening) startListening();
+                  if (!next && listening) stopListening();
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm ${
+                  navMode ? "bg-red-600" : "bg-white/10 hover:bg-white/20"
+                }`}>
+                <Mic className="w-4 h-4" />
+                {navMode ? T.handsFreeOn : T.enableHandsFree}
+              </button>
+            </div>
           </div>
 
           {activityData.materials?.length > 0 && (
@@ -584,16 +717,48 @@ function ActivityView({
             ))}
           </div>
 
-          {/* Big current step for the smartboard */}
-          <div className="liquid-glass bg-gradient-to-br from-white/[0.06] to-transparent rounded-2xl p-8 md:p-10 min-h-[200px] md:min-h-[220px] flex flex-col justify-center">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-400">{T.step} {step + 1} {T.of} {steps.length}</p>
-              <button onClick={() => onNarrate(current)}
-                className="flex items-center gap-2 text-sm bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg">
-                <Volume2 className="w-4 h-4" /> {T.readAloud}
-              </button>
+          {/* Big current step for the smartboard — text + generated visual */}
+          <div className="liquid-glass bg-gradient-to-br from-white/[0.06] to-transparent rounded-2xl p-6 md:p-8">
+            <div className={`grid gap-6 items-center ${showVisuals ? "md:grid-cols-2" : ""}`}>
+              <div className="flex flex-col justify-center min-h-[160px]">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-gray-400">{T.step} {step + 1} {T.of} {steps.length}</p>
+                  <button onClick={() => onNarrate(current)}
+                    className="flex items-center gap-2 text-sm bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg">
+                    <Volume2 className="w-4 h-4" /> {T.readAloud}
+                  </button>
+                </div>
+                <p className="text-2xl md:text-3xl font-semibold leading-snug">{current}</p>
+              </div>
+
+              {showVisuals && (
+                <div>
+                  {stepLoading === step ? (
+                    <div className="aspect-video rounded-xl bg-white/5 flex flex-col items-center justify-center text-white/50">
+                      <Loader2 className="w-7 h-7 animate-spin mb-2" />
+                      <p className="text-sm">{T.drawing}</p>
+                    </div>
+                  ) : stepImages[step] ? (
+                    <div className="relative">
+                      <img src={stepImages[step]} alt={`Step ${step + 1} illustration`}
+                        className="w-full rounded-xl border border-white/10" />
+                      <button onClick={() => genStep(step, true)} title={T.regenerate}
+                        className="absolute top-2 right-2 liquid-glass rounded-full p-2 text-white/80 hover:text-white">
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="aspect-video rounded-xl bg-white/5 flex flex-col items-center justify-center text-center p-4">
+                      <p className="text-sm text-red-300 mb-2">{stepErr[step] || T.imageError}</p>
+                      <button onClick={() => genStep(step, true)}
+                        className="flex items-center gap-2 text-sm bg-white text-black px-3 py-1.5 rounded-lg hover:bg-white/90">
+                        <RefreshCw className="w-4 h-4" /> {T.regenerate}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <p className="text-2xl md:text-3xl font-semibold leading-snug">{current}</p>
           </div>
 
           <div className="flex items-center justify-center gap-3 md:gap-4">

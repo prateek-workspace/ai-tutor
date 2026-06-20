@@ -28,6 +28,7 @@ from utils.gemini import (
     detect_intent,
 )
 from utils.tts import text_to_speech
+from utils.image import generate_image
 from utils import db
 from openapi import OPENAPI_SPEC
 
@@ -182,6 +183,22 @@ def tts():
     try:
         audio = text_to_speech(text, voice=voice)
         return Response(audio, mimetype="audio/wav")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# Visual aid: generate an illustration for a quiz question / concept
+# ---------------------------------------------------------------------------
+@app.route("/image", methods=["POST"])
+def image():
+    data = request.get_json(silent=True) or {}
+    prompt = (data.get("prompt") or "").strip()
+    if not prompt:
+        return jsonify({"error": "prompt is required"}), 400
+    try:
+        img, mime = generate_image(prompt)
+        return Response(img, mimetype=mime)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

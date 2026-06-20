@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Sparkles, RotateCcw, CheckCircle2, XCircle } from "lucide-react";
-import ToolHeader from "@/components/ToolHeader";
+import AppNav from "@/components/AppNav";
 import { quiz as generateQuiz } from "@/lib/api";
 
 export default function QuizStudio() {
@@ -42,7 +42,7 @@ export default function QuizStudio() {
 
   return (
     <div className="min-h-screen bg-black text-white dark-scroll">
-      <ToolHeader title="Quiz Studio" subtitle="Generate a quiz on any topic and play it" />
+      <AppNav />
 
       <main className="max-w-3xl mx-auto px-6 py-10 space-y-8">
         {/* Generator */}

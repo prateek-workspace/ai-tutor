@@ -179,6 +179,23 @@ OPENAPI_SPEC = {
                 },
             }
         },
+        "/image": {
+            "post": {
+                "tags": ["Assistant"],
+                "summary": "Visual aid image",
+                "description": "Generate an illustration (PNG) for a quiz question or concept.",
+                "requestBody": {"required": True, "content": {"application/json": {"schema": {
+                    "type": "object",
+                    "required": ["prompt"],
+                    "properties": {"prompt": {"type": "string", "example": "Classroom illustration of the water cycle"}},
+                }}}},
+                "responses": {
+                    "200": {"description": "PNG image", "content": {"image/png": {"schema": {"type": "string", "format": "binary"}}}},
+                    "400": {"$ref": "#/components/responses/BadRequest"},
+                    "500": {"$ref": "#/components/responses/ServerError"},
+                },
+            }
+        },
         "/history": {
             "get": {
                 "tags": ["System"],

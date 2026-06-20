@@ -3,7 +3,7 @@
 import { useState } from "react";
 import jsPDF from "jspdf";
 import { Loader2, FileText, Download, Eye, EyeOff } from "lucide-react";
-import ToolHeader from "@/components/ToolHeader";
+import AppNav from "@/components/AppNav";
 import { quiz as generateQuiz } from "@/lib/api";
 
 export default function TestGenerator() {
@@ -61,7 +61,7 @@ export default function TestGenerator() {
 
   return (
     <div className="min-h-screen bg-black text-white dark-scroll">
-      <ToolHeader title="Test Generator" subtitle="Create a short-answer question paper from any topic" />
+      <AppNav />
 
       <main className="max-w-3xl mx-auto px-6 py-10 space-y-8">
         <section className="liquid-glass rounded-3xl p-6 md:p-8">

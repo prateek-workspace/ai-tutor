@@ -3,7 +3,7 @@
 
 // The backend defaults to port 10000 (see apiEndpoints.py: os.getenv("PORT", 10000)).
 export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:10000";
+  process.env.NEXT_PUBLIC_API_BASE_URL || `https://127.0.0.1:10000`;
 
 // Turns the browser's cryptic "Failed to fetch" into something a teacher can act on.
 const UNREACHABLE = (path) =>
@@ -56,6 +56,30 @@ export async function fetchSpeech(text, voice) {
     body: JSON.stringify({ text, voice }),
   });
   if (!res.ok) throw new Error(`Narration failed (HTTP ${res.status}).`);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
+// ---- Recent generated content (from NeonDB, if configured) ----
+export async function getHistory(limit = 12, kind) {
+  const q = kind ? `?kind=${encodeURIComponent(kind)}&limit=${limit}` : `?limit=${limit}`;
+  const res = await safeFetch(`/history${q}`, { method: "GET" });
+  if (!res.ok) throw new Error(`Could not load history (HTTP ${res.status}).`);
+  return res.json();
+}
+
+// ---- Gemini image generation: returns a displayable object URL ----
+export async function fetchImage(prompt) {
+  const res = await safeFetch("/image", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+  });
+  if (!res.ok) {
+    let msg = `Image generation failed (HTTP ${res.status}).`;
+    try { const d = await res.json(); if (d.error) msg = d.error; } catch {}
+    throw new Error(msg);
+  }
   const blob = await res.blob();
   return URL.createObjectURL(blob);
 }
